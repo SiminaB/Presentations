@@ -84,7 +84,8 @@
 \begin{frame}
 \frametitle{Goal}
 
-Incorporate {\color{red}external covariates (meta-data)} in decision of whether to reject a hypothesis when testing many hypotheses at once.
+Extend {\color{red}false discovery rate framework} to easily
+incorporate {\color{red}external covariates (meta-data)} in decision of whether to reject a hypothesis when testing many hypotheses at once.
 
 \end{frame}
 
@@ -156,7 +157,7 @@ FDR control and estimation approaches rely on an estimate of the proportion of n
 
 \begin{itemize}
 \item Original Benjamini-Hochberg (BH) approach assumes $\pi_0 \equiv 1$
-\item Storey, 2002, \textit{JRSSB} estimates $\pi_0$ as a fixed value and multiplies the BH ``q-values'' by $\hat{\pi}_0$.
+\item Storey, 2002, \textit{JRSSB} estimates $\pi_0$ as a fixed value and multiplies the BH FDR estimates by $\hat{\pi}_0$.
 \item We expand this framework to estimate $\pi_0$ as a function of external covariates.
 \end{itemize}
 
@@ -294,10 +295,10 @@ $\pi_0(\bx)$ by:
 Additional details:
 
 \begin{itemize}
-\item Use logistic regression for estimating $E[Y_i|\bX_i=\bx_i]$.
 \item May need to threshold at 1, given division by $1-\lambda$.
 \item Can fix $\lambda$ at e.g. 0.8 or 0.9 \textit{or} smooth over a series of thresholds $\lambda \in (0,1)$.
 \item Can use a bootstrap approach for confidence intervals.
+\item For BMI GWAS, split MAFs into 3 categories and used cubic splines with 5 degrees of freedom for N.
 \end{itemize}
 
 \end{frame}
@@ -313,7 +314,7 @@ Additional details:
 \includegraphics[scale=0.48]{Fig2-1.pdf} 
 \end{center}
 
-Grey = 90\% bootstrap CI
+Grey = 90\% bootstrap CI \\
 Vertical line = median sample size
 
 \end{frame}
@@ -382,7 +383,7 @@ Power = TPR (true positive rate) = fraction of truly alternative discoveries out
 
 \begin{itemize}
 \item If there is no or low correlation between test statistics, generally shows good control of FDR
-\item Always leads to an improvement over Benjamini-Hochberg case, which increases with lower $\pi_0(\bx_i)$ (max 6\%-11\% in absolute terms)
+\item Always leads to an improvement in power over Benjamini-Hochberg, which increases with lower $\pi_0(\bx_i)$ (max 6\%-11\% in absolute terms)
 \item Improved interpretability compared to Storey's approach
 \item FDR control is much better compared to Scott FDR regression approach when test statistics are not from a normal distribution
 \end{itemize}
