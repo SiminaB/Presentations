@@ -232,7 +232,7 @@ FDR(\bx_i) &=& E \left [  \frac{V}{R} \bigg| R > 0, \bX_i=\bx_i \right ] Pr(R > 
 \begin{itemize}
 \item Looked at $\sim$2.5 million SNPs in $\sim$340,000 individuals, considering their association with BMI.
 \vspace{0.5cm}
-\item ~320,000 were of European descent
+\item $\sim$320,000 were of European descent
 \begin{itemize}
 \item Used HapMap CEU population as reference for MAF
 \end{itemize}
@@ -268,15 +268,14 @@ Assume that null p-values come from Uniform(0,1) and the alternative p-values fr
 so that for a large enough $\lambda \in (0,1)$, $G(\lambda) \approx 1$.
 
 \vspace{0.5cm}
-Define $Y_i = 1(\mbox{P-value from test $i > \lambda$})$
+Define: $Y_i = 1(\mbox{P-value from test $i > \lambda$}) = P(\mbox{test $i$ not rejected at level $\lambda$})$.
 
 \vspace{0.5cm}
-Then, we obtain, for a fixed threshold $\lambda$:
-
+For a fixed threshold $\lambda$:
 \begin{eqnarray*}
 \pi_0(\bx_i) &\approx& \frac{E[Y_i|\bX_i=\bx_i] }{1-\lambda}.
 \end{eqnarray*}
-We can use a regression framework to estimate $E[Y_i|\bX_i=\bx_i]$, then estimate
+Use a regression framework to estimate $E[Y_i|\bX_i=\bx_i]$, then estimate
 $\pi_0(\bx)$ by:
 \begin{eqnarray*}
 \label{eq:est-pio-x}
@@ -331,7 +330,7 @@ Vertical line = median sample size
 
 \item Note that is the same as approach of Storey, but considers extension to covariates
 
-\item Major assumption: Conditional on the null and the alternative, the p-values do not depend on the covariates
+\item Major assumption: Conditional on the null and the alternative, the p-values do not depend on the covariates\\ \vspace{0.2cm}
 i.e. the probability of a feature being from one of the two distributions depends on the covariates but the actual test statistic and p-value
 does not depend on the covariates further.
 \end{itemize}
