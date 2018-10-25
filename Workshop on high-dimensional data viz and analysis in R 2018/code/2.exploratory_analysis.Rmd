@@ -1,0 +1,93 @@
+---
+title: "Principal component analysis, generate Figure 1"
+author: "Boca et al"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.path="../figs/")
+```
+
+## Load all libraries and functions
+
+```{r}
+library(ggplot2)
+
+source("functions.R")
+```
+
+## Load data
+
+```{r}
+load("../objs/MasterFrame.RData")
+```
+
+## Perform principal components analysis (PCA)
+
+### First perform the decomposition
+
+```{r}
+pca <- prcomp(MasterFrame[,mets],
+              center=TRUE, scale=TRUE)$x
+dim(pca)
+```
+
+### Save the percent of the total variance explained by each component
+
+```{r}
+##get variance of each component
+varComp <- diag(cov(pca))
+##get fraction of variance explained by each component
+varComp[1]/sum(varComp)
+varComp[2]/sum(varComp)
+##check this with the output from the R object:
+summary(prcomp(MasterFrame[,mets],
+               center=TRUE, scale=TRUE))$importance[,1:5]
+
+##add them to MasterFrame object, so it is easier to use aesthetics
+MasterFrame <- cbind(MasterFrame,
+                     pca[,1:5])
+```
+
+### Figure 1
+
+Make PCA plots for age categories and sites side-by-side to generate Figure 1 from paper:
+
+```{r Fig1, fig.height=4, fig.width=12}
+ggPlot1 <- ggplot(MasterFrame, aes(x=PC1, y=PC2)) +
+  geom_point(size=2.2, aes(shape=Status, color=Category)) +
+  scale_color_discrete(name="Age category") +
+  scale_shape_manual(values=c(1,19), name="Disease status") +
+  xlab(paste("PC1 (", round(varComp[1]/sum(varComp)*100), "%)", sep="")) +
+  ylab(paste("PC2 (", round(varComp[2]/sum(varComp)*100), "%)", sep="")) +
+  theme(plot.title = element_text(size = 15, hjust = 0.5, vjust=1.5),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size=14),
+        axis.title = element_text(size=14)) +
+  guides(color = guide_legend(order=1),
+         shape = guide_legend(order=2)) +
+  ggtitle("a)")
+
+ggPlot2 <- ggplot(MasterFrame, aes(x=PC1, y=PC2)) +
+  geom_point(size=2.2, aes(color=Site, shape=Status)) +
+  scale_shape_manual(values=c(1,19), name="Disease status") +
+  xlab(paste("PC1 (", round(varComp[1]/sum(varComp)*100), "%)", sep="")) +
+  ylab(paste("PC2 (", round(varComp[2]/sum(varComp)*100), "%)", sep="")) +
+  theme(plot.title = element_text(size = 15, hjust = 0.5, vjust=1.5),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size=14),
+        axis.title = element_text(size=14)) +
+  guides(color = guide_legend(order=1),
+         shape = guide_legend(order=2)) +
+  ggtitle("b)")
+
+multiplot(ggPlot1, ggPlot2, cols=2)
+```
+
+## Session information
+
+Get session information:
+
+```{r}
+sessionInfo()
+```

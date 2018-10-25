@@ -1,0 +1,171 @@
+---
+title: "Read in data, look at basic statistics, generate Table 1"
+author: "Boca et al"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load all libraries and functions
+
+```{r}
+library(knitr)
+library(RCurl) ##for getURL
+
+source("functions.R")
+```
+
+## Load data, add age categories
+
+Read in data from csv file on Github:
+
+```{r}
+file_url <- getURL("https://raw.githubusercontent.com/SiminaB/DMD-metabolomics/master/S1_Table.csv")
+MasterFrame <- read.csv(text=file_url)
+```
+
+Take a look at the dataset:
+
+```{r}
+dim(MasterFrame)
+head(colnames(MasterFrame))
+tail(colnames(MasterFrame))
+
+MasterFrame[1:5,1:5]
+```
+
+Create vector of metabolites and get number of metabolites:
+
+```{r}
+##metabolite IDs all have the format (from XCMS) of M.mass.T.retentiontime.n/p 
+##(for negative or positive mode) 
+mets <- colnames(MasterFrame)[grep("M[[:digit:]]+T[[:digit:]]+",colnames(MasterFrame))]
+head(mets)
+tail(mets)
+length(mets)
+```
+
+Create age categories:
+
+```{r}
+range(MasterFrame$Age)
+
+MasterFrame$Category <- ""
+
+MasterFrame$Category[MasterFrame$Age >= 4 & MasterFrame$Age < 7] <- 
+  "4-7 years"
+MasterFrame$Category[MasterFrame$Age >= 7 & MasterFrame$Age < 11] <- 
+  ">7-11 years"
+MasterFrame$Category[MasterFrame$Age >= 11 & MasterFrame$Age < 18] <- 
+  ">11-18 years"
+MasterFrame$Category[MasterFrame$Age >= 18 & MasterFrame$Age < 29] <- 
+  ">18-29 years"
+
+MasterFrame$Category <- 
+  factor(MasterFrame$Category, 
+         levels = c("4-7 years", 
+                    ">7-11 years", 
+                    ">11-18 years",
+                    ">18-29 years"))
+
+table(MasterFrame$Category)
+```
+
+## Get basic statistics
+
+Get some basic statistics, like number of DMD cases and controls by site, age distribution for each
+group:
+
+```{r}
+##number of DMD cases and controls:
+table(MasterFrame$Status)
+
+##number of people at each site:
+table(MasterFrame$Site)
+
+##number of DMD cases and controls by site:
+table(MasterFrame$Status, MasterFrame$Site)
+
+##age distribution in each group:
+quantile(MasterFrame$Age[MasterFrame$Status == "DMD"])
+quantile(MasterFrame$Age[MasterFrame$Status == "Control"])
+
+table(MasterFrame$Category[MasterFrame$Status == "DMD"])
+table(MasterFrame$Category[MasterFrame$Status == "Control"])
+```
+
+## Generate Table 1
+
+Generate Table 1 from paper:
+```{r}
+tabBySite <- table(MasterFrame$Site, MasterFrame$Status)
+tabBySite <- data.frame(tabBySite)
+tabBySite
+colnames(tabBySite) <- c("Site", "Status", "N")
+reshape(tabBySite, timevar="Status", idvar="Site", direction="wide")
+tabBySite <- reshape(tabBySite, timevar="Status", idvar="Site", direction="wide") 
+##reorder to put DMD first
+tabBySite
+tabBySite <- tabBySite[,c(1,3,2)]
+##reorder to sort by total numbers
+tabBySite <- tabBySite[order(rowSums(as.matrix(tabBySite[,-1])),
+                             decreasing=TRUE), ]
+
+##now have a separate table for age
+tabByAge <- 
+  data.frame(Age = "Age",
+             DMD = 
+               paste(round(quantile(MasterFrame$Age[MasterFrame$Status == "DMD"],
+                                    probs = c(0, 0.5, 1)),1), sep="", collapse=", "),
+             Controls = 
+               paste(round(quantile(MasterFrame$Age[MasterFrame$Status == "Control"],
+                                    probs = c(0, 0.5, 1)),1), sep="", collapse=", "))
+
+tabByAge                                  
+##add in total by age categories
+tabByAgeGroup <- table(MasterFrame$Category, MasterFrame$Status)
+tabByAgeGroup <- data.frame(tabByAgeGroup)
+tabByAgeGroup
+colnames(tabByAgeGroup) <- c("Age", "Status", "N")
+reshape(tabByAgeGroup, timevar="Status", idvar="Age", direction="wide")
+tabByAgeGroup <- reshape(tabByAgeGroup, timevar="Status", idvar="Age", direction="wide") 
+##reorder to put DMD first
+tabByAgeGroup
+tabByAgeGroup <- tabByAgeGroup[,c(1,3,2)]
+colnames(tabByAge) <- c("Age", "N.DMD", "N.Control")
+tabByAge <- sapply(tabByAge, as.character)
+tabByAgeGroup <- sapply(tabByAgeGroup, as.character)
+tabByAge <- rbind(tabByAge, tabByAgeGroup)
+tabByAge
+
+##add in totals at the end
+tabByAge <- 
+  rbind(tabByAge,
+        c("Total", sum(MasterFrame$Status == "DMD"), 
+          sum(MasterFrame$Status == "Control")))
+tabByAge
+
+rownames(tabBySite) <- rownames(tabByAge) <- NULL
+```
+
+```{r}
+kable(tabBySite)
+kable(tabByAge)
+```
+
+## Save objects
+
+```{r}
+save(list=c("MasterFrame","mets"),
+     file="../objs/MasterFrame.RData")
+```
+
+## Session information
+
+Get session information:
+
+```{r}
+sessionInfo()
+```

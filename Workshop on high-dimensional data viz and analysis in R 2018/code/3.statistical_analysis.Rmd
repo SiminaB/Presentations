@@ -1,0 +1,221 @@
+---
+title: "Statistical data analysis"
+author: "Boca et al"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, fig.path="../figs/")
+```
+
+## Load all libraries and functions
+
+```{r}
+library(ggplot2)
+library(RColorBrewer)
+library(corrplot)
+
+source("functions.R")
+```
+
+## Load data
+
+```{r}
+load("../objs/MasterFrame.RData")
+```
+
+## Compare DMD cases and healthy controls considering the effects of age and study site
+
+Fit a linear model with transformed metabolite intensities as outcomes, regressing on DMD status, age, their interaction, and study site. Compare it to a model which has just age and study center, testing whether the coefficients of DMD and of DMD x age are 0. Thus, the test is to see whether there is any effect of DMD on the intensities in the presence of age.
+
+```{r}
+##get p-values for testing whether there is any effect of DMD
+##(so compare this model to just a model for age and study center)
+pValsAnyDMD <- vapply(MasterFrame[,mets],
+                      function(metInt, status, age, site){
+                        ##interaction model
+                        lm.metInt <- lm(metInt ~ status*age + as.factor(site));
+                        ##age-only model
+                        lm.metAge <- lm(metInt ~ age + as.factor(site));
+                        anova(lm.metInt, lm.metAge)["Pr(>F)"][2,1]  
+                      }, 
+                      FUN.VALUE = 0.1,
+                      MasterFrame$Status,
+                      MasterFrame$Age,
+                      MasterFrame$Site)
+```
+
+### Find top peaks
+
+Now look at how many of the peaks have q-values less than or equal to 0.05 and 0.01 (use just the 0.01 moving forward), so that the false
+discovery rate is controlled at 0.05 and 0.01, as well as how many peaks are significant at a Bonferroni-corrected threshold of 0.05:
+
+```{r}
+qValsAnyDMD <- p.adjust(pValsAnyDMD, method="BH")
+length(qValsAnyDMD)
+sum(qValsAnyDMD <= 0.05)
+sum(qValsAnyDMD <= 0.01)
+
+topFDRpeaks <- names(which(qValsAnyDMD <= 0.01))
+##sort the top peaks by the p-values
+topFDRpeaks <- topFDRpeaks[order(pValsAnyDMD[topFDRpeaks])]
+topFDRpeaks
+
+topFWERpeaks <- names(which(pValsAnyDMD <= 0.05/length(pValsAnyDMD)))
+##sort them by p-value, from lowest to highest
+topFWERpeaks <- topFWERpeaks[order(pValsAnyDMD[topFWERpeaks])]
+topFWERpeaks
+```
+
+### Make plots for top peaks
+
+Make some nice plots for them. Generate both boxplots and plots versus age (they are actually displayed later):
+
+```{r}
+##save all the top plots in list
+ggTop <- list()
+##also save all boxplots in list
+ggTopBox <- list()
+##get all sites
+sites <- levels(MasterFrame$Site)
+nrSites <- length(sites)
+for(met in topFDRpeaks)
+{
+  lmMet <- lm(MasterFrame[,met] ~ 
+                MasterFrame[,"Status"]*MasterFrame[,"Age"]+as.factor(MasterFrame[,"Site"]), 
+              data=MasterFrame)
+  lmMet
+
+  pred <- predict(lmMet)
+  
+  ##get the linear model predictions for Calgary controls and DMD
+  whichCalgContr <- which(MasterFrame$Site == "Calgary" &
+                            MasterFrame$Status == "Control")
+  whichCalgDMD <- which(MasterFrame$Site == "Calgary" &
+                          MasterFrame$Status == "DMD")  
+  predCalgContr <- cbind(MasterFrame$Age[whichCalgContr],
+                         pred[whichCalgContr])
+  predCalgDMD <- cbind(MasterFrame$Age[whichCalgDMD],
+                       pred[whichCalgDMD])
+  
+  ##get the linear model predictions for the Davis group (only DMD)
+  whichDavis <- which(MasterFrame$Site == "UC Davis")
+  predDavis <- cbind(MasterFrame$Age[whichDavis],
+                     pred[whichDavis])
+  
+  ##get the values for min and max age for these groups (to plot the segments)
+  CalgDMDseg <- matrix(c(min(predCalgDMD[,1]), 
+                         predCalgDMD[which.min(predCalgDMD[,1]),2],
+                         max(predCalgDMD[,1]), 
+                         predCalgDMD[which.max(predCalgDMD[,1]),2]),
+                       nrow=2, byrow=TRUE)
+  CalgContrSeg <- matrix(c(min(predCalgContr[,1]), 
+                           predCalgContr[which.min(predCalgContr[,1]),2],
+                           max(predCalgContr[,1]), 
+                           predCalgContr[which.max(predCalgContr[,1]),2]),
+                         nrow=2, byrow=TRUE)  
+  DavisDMDseg <- matrix(c(min(predDavis[,1]), 
+                          predDavis[which.min(predDavis[,1]),2],
+                          max(predDavis[,1]), 
+                          predDavis[which.max(predDavis[,1]),2]),
+                        nrow=2, byrow=TRUE)
+  segs <- data.frame(Site = c("Calgary", "Calgary", "UC Davis"),
+                     Status = c("DMD", "Control", "DMD"),
+                     x = c(CalgDMDseg[1,1], CalgContrSeg[1,1], DavisDMDseg[1,1]),
+                     y = c(CalgDMDseg[1,2], CalgContrSeg[1,2], DavisDMDseg[1,2]),
+                     xend = c(CalgDMDseg[2,1], CalgContrSeg[2,1], DavisDMDseg[2,1]),
+                     yend = c(CalgDMDseg[2,2], CalgContrSeg[2,2], DavisDMDseg[2,2]))
+                     
+  ggTop[[met]] <- ggplot(MasterFrame, aes_string(x="Age", y=met, shape="Status", color="Status")) +
+    geom_point(size=2.5) +
+    geom_segment(data=segs, aes(x=x, y=y, 
+                                xend=xend, yend=yend,
+                                linetype=Site),
+                 size=1.1) +
+    scale_color_manual(name = "Class", 
+                       breaks = c("Control", "DMD"),
+                       labels = c("Control", "DMD"),
+                       values = c(4,2)) +
+    scale_shape_manual(name = "Class", 
+                       breaks = c("Control", "DMD"),
+                       labels = c("Control", "DMD"),
+                       values = c(1,2)) +
+    scale_y_continuous(name="Normalized intensity") +
+    labs(title=(paste(met, ", ", 
+                      "p-value: ", signif(pValsAnyDMD[met],2), ", ",
+                      "q-value: ", signif(qValsAnyDMD[met],2),
+                      sep=""))) +
+    theme(plot.title = element_text(size = 15, hjust = 0.2, vjust=1.5),
+          legend.title = element_text(size = 14),
+          legend.text = element_text(size=14),
+          axis.title = element_text(size=14))
+  
+  ggTopBox[[met]] <- ggplot(MasterFrame, aes_string(x="Status", y=met))+
+    geom_boxplot() +
+    geom_point(size=3.0, aes(color=Category)) +
+    scale_y_continuous(name="Normalized intensity") +
+    labs(title=met) + 
+    scale_color_discrete(name = "Age category") +
+    theme(plot.title = element_text(size = 15, hjust = 0.2, vjust=1.5),
+          legend.title = element_text(size = 14),
+          legend.text = element_text(size=14),
+          axis.title = element_text(size=14))
+}
+```
+
+### Display plots versus age for top peaks
+
+Plots of the intensities versus age, including some of the fitted regression lines, coded by case/control status:
+
+```{r Fig 2, fig.width=14, fig.height=14}
+multiplot(plotlist=ggTop, layout=matrix(1:length(ggTop), ncol=2, byrow=TRUE))
+```
+
+### Display boxplots for case/control status for top peaks
+
+Boxplots of the intensities versus case control status, color-coded by age category:
+
+```{r Fig 3, fig.width=9, fig.height=14}
+multiplot(plotlist=ggTopBox, layout=matrix(1:length(ggTopBox), ncol=2, byrow=TRUE))
+```
+
+### Correlation plot for top peaks
+
+Also calculate and plot the correlations between the top peaks:
+
+```{r Fig 4}
+##make it in matrix version as well:
+cor.matrix <- matrix(NA, length(topFDRpeaks), length(topFDRpeaks))
+
+for(i1 in 1:length(topFDRpeaks))
+{
+  for(i2 in 1:length(topFDRpeaks))
+  {
+    Met1 <- topFDRpeaks[i1]
+    Met2 <- topFDRpeaks[i2]
+    
+    cor.matrix[i1, i2] <- 
+      cor(MasterFrame[, Met1], MasterFrame[, Met2])
+  }
+}
+rownames(cor.matrix) <- colnames(cor.matrix) <- topFDRpeaks
+
+round(cor.matrix, 2)
+
+par(mar=c(17,16,0.5,0.5)+0.1, oma=c(1,1,1,1),
+    cex = 0.95)
+corrplot(round(cor.matrix,2), col=rev(brewer.pal(11, "RdGy")),##[c(1,3,5,6,7,9,11)]), 
+         method="color",
+         tl.pos="lt",
+         type="lower", tl.col="black")
+
+```
+
+## Session information
+
+Get session information:
+
+```{r}
+sessionInfo()
+```
+
